@@ -1,0 +1,35 @@
+<?xml version="1.0" ?>
+<Patients>
+  <Patient>
+    <name/>
+    <dob>2025-06-23</dob>
+    <age>0</age>
+    <phone/>
+    <symptoms/>
+    <Tests/>
+    <consultation_fee>200</consultation_fee>
+    <total_amount>200</total_amount>
+    <date>2025-06-23</date>
+  </Patient>
+  <Patient>
+    <name>Ibhav Malviya</name>
+    <age>52</age>
+    <phone>6232381616</phone>
+    <symptoms>Fever and cough</symptoms>
+    <Tests/>
+    <consultation_fee>200</consultation_fee>
+    <total_amount>200</total_amount>
+    <date>2025-06-23</date>
+  </Patient>
+  <Patient>
+    <name/>
+    <age>0</age>
+    <gender>Male</gender>
+    <phone>123123123123123123</phone>
+    <symptoms/>
+    <Tests/>
+    <consultation_fee>200</consultation_fee>
+    <total_amount>200</total_amount>
+    <date>2025-06-23</date>
+  </Patient>
+</Patients>
