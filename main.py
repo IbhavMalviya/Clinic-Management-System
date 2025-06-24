@@ -27,12 +27,11 @@ patients = load_json(PATIENTS_FILE, [])
 earnings = load_json(EARNINGS_FILE, {})
 tests = load_json(TESTS_FILE, {})
 
-# App title
 st.markdown("""
-    <h1 style='text-align: center; color: #4CAF50;'>🩺 Clinic Management System</h1>
-    <hr style='margin-bottom: 30px;'>
+    <h1 style='font-family: "Trebuchet MS", sans-serif; color: #008000;'>
+        🩺 Dr. Pramod Malviya
+    </h1>
 """, unsafe_allow_html=True)
-
 # --------------------------- Navigation ---------------------------
 page = st.sidebar.radio("Navigation", ["Add Patient", "View Patients", "Earnings", "Admin Panel", "Backup"])
 
