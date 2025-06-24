@@ -7,11 +7,11 @@ from Utils.Storage import load_json, save_json
 import pandas as pd
 import io
 from Utils.Export import patients_to_xml
+import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKUP_DIR = os.path.join(BASE_DIR, "backup")
 os.makedirs(BACKUP_DIR, exist_ok=True)
-
 
 # --------------------------- Setup ---------------------------
 st.set_page_config(page_title="Clinic Management App", layout="wide")
@@ -28,91 +28,135 @@ earnings = load_json(EARNINGS_FILE, {})
 tests = load_json(TESTS_FILE, {})
 
 # App title
-st.title("🩺 Clinic Management System")
+st.markdown("""
+    <h1 style='text-align: center; color: #4CAF50;'>🩺 Clinic Management System</h1>
+    <hr style='margin-bottom: 30px;'>
+""", unsafe_allow_html=True)
 
 # --------------------------- Navigation ---------------------------
-page = st.sidebar.radio("Navigation", ["Add Patient", "View Patients", "Earnings", "Admin Panel","Backup"])
-
+page = st.sidebar.radio("Navigation", ["Add Patient", "View Patients", "Earnings", "Admin Panel", "Backup"])
 
 # --------------------------- Add Patient Page ---------------------------
 if page == "Add Patient":
     st.header("➕ Add Patient Record")
-
     with st.form("add_patient_form"):
-        name = st.text_input("Patient Name")
-        age = st.number_input("Age", min_value=0, max_value=120, step=1)
-        phone = st.text_input("Phone Number", max_chars=10)
-        phone_valid=phone.isdigit() and len(phone) == 10
-        gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-        if phone:  # Only show warning if something is entered
+        st.subheader("👤 Patient Information")
+        col1, col2 = st.columns(2)
+        with col1:
+            patient_name = st.text_input("Patient Name")
+            age = st.number_input("Age", min_value=0, max_value=120, step=1)
+        with col2:
+            gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+            phone = st.text_input("Phone Number", max_chars=10)
+
+        phone_valid = phone.isdigit() and len(phone) == 10
+        if phone:
             if not phone.isdigit():
                 st.warning("⚠️ Phone number must contain only digits.")
             elif len(phone) < 10:
                 st.warning(f"⚠️ Phone number is too short ({len(phone)}/10 digits).")
             elif len(phone) > 10:
                 st.warning(f"⚠️ Phone number is too long ({len(phone)}/10 digits).")
-            elif not phone_valid:
-                st.warning("⚠️ Phone number must be exactly 10 digits long.")
-                
-        symptoms = st.text_area("Symptoms")
 
-        st.subheader("🧪 Select Tests and Enter Results/Cost")
-        selected_tests = []
+        if patient_name and len(patient_name.strip()) == 0:
+            st.warning("⚠️ Name cannot be empty.")
+
+        symptoms = st.text_area("📝 Symptoms")
+
+        # Initialize selected_tests once
+        if "selected_tests" not in st.session_state:
+            st.session_state.selected_tests = []
+
+        # Select multiple tests with cost info
+        test_options = [f"{test_name} (₹{price})" for test_name, price in tests.items()]
+        test_lookup = {f"{test_name} (₹{price})": test_name for test_name, price in tests.items()}
+        selected_option_labels = st.multiselect("🧪 Search and Select Tests", options=test_options)
+
+        # Update selected_tests reactively
+        selected_names = [test_lookup[label] for label in selected_option_labels]
+        st.session_state.selected_tests = [
+            test for test in st.session_state.selected_tests if test["name"] in selected_names
+        ]
+        # Add newly selected tests if not present
+        existing_names = {test["name"] for test in st.session_state.selected_tests}
+        for test_name in selected_names:
+            if test_name not in existing_names:
+                st.session_state.selected_tests.append({
+                    "name": test_name,
+                    "value": "",
+                    "cost": tests[test_name]
+                })
+
+        # Display selected tests with editable values
         total_test_cost = 0
+        if st.session_state.selected_tests:
+            st.markdown("### ✅ Selected Tests")
+            for i, test in enumerate(st.session_state.selected_tests):
+                col1, col2, col3 = st.columns([4, 3, 2])
+                col1.markdown(f"**{test['name']}**")
+                test['value'] = col2.text_input("Result", value=test['value'], key=f"res_{i}")
+                test['cost'] = col3.number_input("₹", value=test['cost'], min_value=0, key=f"cost_{i}")
+                total_test_cost += test["cost"]
 
-        for test in tests:
-            with st.expander(f"{test} (Base Price: ₹{tests[test]})", expanded=False):
-                selected = st.checkbox(f"Include {test}", key=f"select_{test}")
-                if selected:
-                    value = st.text_input(f"Result for {test}", key=f"value_{test}")
-                    price = st.number_input(f"Price for {test}", value=tests[test], key=f"price_{test}")
-                    selected_tests.append({"name": test, "value": value, "cost": price})
-                    total_test_cost += price
+        # Consultation fee input with state
+        consult_fee = st.number_input("💵 Consultation Fee", value=st.session_state.get("consult_fee", 350), min_value=0, key="consult_fee")
 
-        consult_fee = st.number_input("Consultation Fee", value=200, min_value=0)
+        # Live total amount
         total_amount = total_test_cost + consult_fee
         st.markdown(f"### 💰 Total Amount: ₹{total_amount}")
 
+        # Reset selected tests if form is cleared or submitted
         submitted = st.form_submit_button("Save Patient Record")
         if submitted:
-            st.session_state.confirm_add = True
-            st.session_state.pending_patient = {
-                "name": name,
+            if not patient_name.strip():
+                st.error("❌ Patient name is required. Record not saved.")
+            else:
+                st.session_state.confirm_add = True
+                now = datetime.datetime.now()
+                st.session_state.pending_patient = {
+                "name": patient_name,
                 "age": age,
                 "gender": gender,
                 "phone": phone,
                 "symptoms": symptoms,
-                "tests": selected_tests,
+                "tests": st.session_state.selected_tests,
                 "consultation_fee": consult_fee,
                 "total_amount": total_amount,
-                "date": str(datetime.date.today())
+                "date": now.strftime("%Y-%m-%d"),
+                "time": now.strftime("%H:%M")
             }
+
 
 # Show second confirmation
 if page == "Add Patient" and st.session_state.get("confirm_add", False):
     st.warning("⚠️ Are you sure you want to save this patient record?")
     col1, col2 = st.columns(2)
+
     if col1.button("✅ Confirm Save"):
-        patient_record = st.session_state.pending_patient
+        pending = st.session_state.get("pending_patient")
 
-        patients.append(patient_record)
-        save_json(PATIENTS_FILE, patients)
+        if not pending or not pending.get("name", "").strip():
+            st.error("❌ Patient name is required. Record not saved.")
+        else:
+            patients.append(pending)
+            save_json(PATIENTS_FILE, patients)
 
-        # Update earnings
-        today = patient_record["date"]
-        earnings[today] = earnings.get(today, 0) + patient_record["total_amount"]
-        save_json(EARNINGS_FILE, earnings)
+            today = pending["date"]
+            earnings[today] = earnings.get(today, 0) + pending["total_amount"]
+            save_json(EARNINGS_FILE, earnings)
 
-        st.success("✅ Patient record saved.")
-        st.session_state.confirm_add = False
-        del st.session_state.pending_patient
-        st.rerun()
+            st.success("✅ Patient record saved.")
+            st.session_state.confirm_add = False
+            del st.session_state.pending_patient
+            st.rerun()
 
     if col2.button("❌ Cancel"):
         st.info("Cancelled adding patient.")
         st.session_state.confirm_add = False
-        del st.session_state.pending_patient
+        if "pending_patient" in st.session_state:
+            del st.session_state.pending_patient
         st.rerun()
+
 
 # --------------------------- Admin Panel ---------------------------
 elif page == "Admin Panel":
@@ -177,10 +221,17 @@ elif page == "Admin Panel":
                 st.success(f"✅ Test '{new_test}' added.")
                 st.rerun()
         st.divider()
-
 # --------------------------- View Patients Page ---------------------------
 elif page == "View Patients":
     st.header("📋 Patient Records")
+        # Date range filter
+    st.subheader("📅 Filter by Date Range")
+    col1, col2 = st.columns(2)
+    start_date = col1.date_input("Start Date", value=datetime.date.today() - datetime.timedelta(days=7))
+    end_date = col2.date_input("End Date", value=datetime.date.today())
+
+    if start_date > end_date:
+        st.warning("⚠️ Start date must be before or equal to end date.")
 
     if not patients:
         st.info("No patient records yet.")
@@ -188,94 +239,177 @@ elif page == "View Patients":
         search = st.text_input("🔍 Search by name or phone number")
         filtered = []
         for p in patients:
-            if (search.lower() in p["name"].lower()) or (search in p["phone"]):
-                filtered.append(p)
+            try:
+                patient_date = datetime.datetime.strptime(p['date'], "%Y-%m-%d").date()
+            except:
+                continue  # skip invalid entries
 
-        if not search:
-            filtered = patients
+            if start_date <= patient_date <= end_date:
+                 if not search or (search.lower() in p["name"].lower()) or (search in p["phone"]):
+                    filtered.append(p)
+
+
 
         st.write(f"Showing {len(filtered)} record(s)")
         for i, p in enumerate(reversed(filtered), 1):  # Newest first
-            with st.expander(f"{i}. {p['name']} - ₹{p['total_amount']} on {p['date']}"):
-                st.markdown(f"**Name:** {p['name']}")
-                st.markdown(f"**Age:** {p['age']} years")   
-                st.markdown(f"**Phone:** {p['phone']}")
-                st.markdown(f"**Symptoms:** {p['symptoms']}")
-                st.markdown(f"**Gender:** {p['gender']}")
-                st.markdown(f"**Date:** {p['date']}")
+            try:
+                dt = datetime.datetime.strptime(f"{p['date']} {p.get('time', '00:00')}", "%Y-%m-%d %H:%M")
+                formatted_date = dt.strftime("%d-%m-%Y")
+                formatted_time = dt.strftime("%I:%M %p")
+            except:
+                formatted_date = p['date']
+                formatted_time = p.get('time', 'Not recorded')
 
-                if p['tests']:
-                    st.markdown("**Tests Done:**")
-                    for test in p['tests']:
-                        st.markdown(f"- {test['name']}: {test['value']} (₹{test['cost']})")
+            with st.expander(f"{i}. {p['name']} - ₹{p['total_amount']} on {formatted_date} at {formatted_time}"):
+                if st.session_state.get(f"editing_{i}", False):
+                    new_name = st.text_input("Name", value=p['name'], key=f"edit_name_{i}")
+                    new_age = st.number_input("Age", value=p['age'], min_value=0, max_value=120, key=f"edit_age_{i}")
+                    new_phone = st.text_input("Phone", value=p['phone'], key=f"edit_phone_{i}")
+                    new_symptoms = st.text_area("Symptoms", value=p['symptoms'], key=f"edit_symptoms_{i}")
+                    new_gender = st.selectbox("Gender", ["Male", "Female", "Other"], index=["Male", "Female", "Other"].index(p.get("gender", "Other")), key=f"edit_gender_{i}")
+                    
+                    new_tests = []
+                    test_total = 0
+                    for j, test in enumerate(p.get("tests", [])):
+                        col1, col2, col3 = st.columns([4, 3, 2])
+                        test_name = col1.text_input("Test Name", value=test['name'], key=f"edit_test_name_{i}_{j}")
+                        test_value = col2.text_input("Result", value=test['value'], key=f"edit_test_val_{i}_{j}")
+                        test_cost = col3.number_input("₹", value=test['cost'], min_value=0, key=f"edit_test_cost_{i}_{j}")
+                        new_tests.append({"name": test_name, "value": test_value, "cost": test_cost})
+                        test_total += test_cost
+
+                    new_fee = st.number_input("Consultation Fee", value=p["consultation_fee"], min_value=0, key=f"edit_fee_{i}")
+                    new_total = test_total + new_fee
+                    st.markdown(f"### 💰 Updated Total: ₹{new_total}")
+
+                    col_save, col_cancel = st.columns(2)
+                    if col_save.button("💾 Save Changes", key=f"save_{i}"):
+                        p.update({
+                            "name": new_name,
+                            "age": new_age,
+                            "phone": new_phone,
+                            "symptoms": new_symptoms,
+                            "gender": new_gender,
+                            "tests": new_tests,
+                            "consultation_fee": new_fee,
+                            "total_amount": new_total
+                        })
+
+                        earnings[p["date"]] = sum(pat["total_amount"] for pat in patients if pat["date"] == p["date"])
+                        save_json(PATIENTS_FILE, patients)
+                        save_json(EARNINGS_FILE, earnings)
+
+                        st.success("✅ Patient record updated.")
+                        st.session_state[f"editing_{i}"] = False
+                        st.rerun()
+
+                    if col_cancel.button("❌ Cancel", key=f"cancel_{i}"):
+                        st.session_state[f"editing_{i}"] = False
+                        st.rerun()
+
                 else:
-                    st.markdown("No tests performed.")
+                    st.markdown(f"**Name:** {p['name']}")
+                    st.markdown(f"**Age:** {p['age']} years")
+                    st.markdown(f"**Phone:** {p['phone']}")
+                    st.markdown(f"**Symptoms:** {p['symptoms']}")
+                    st.markdown(f"**Gender:** {p.get('gender', 'Not specified')}")
+                    st.markdown(f"**Date:** {formatted_date}")
+                    st.markdown(f"**Time:** {formatted_time}")
 
-                st.markdown(f"**Consultation Fee:** ₹{p['consultation_fee']}")
-                st.markdown(f"**Total Paid:** ₹{p['total_amount']}")
+                    if p['tests']:
+                        st.markdown("**Tests Done:**")
+                        for test in p['tests']:
+                            st.markdown(f"- {test['name']}: {test['value']} (₹{test['cost']})")
+                    else:
+                        st.markdown("No tests performed.")
 
-                # Add delete button
-                if st.button("🗑️ Delete Record", key=f"delete_{i}"):
-                    patients.remove(p)
+                    st.markdown(f"**Consultation Fee:** ₹{p['consultation_fee']}")
+                    st.markdown(f"**Total Paid:** ₹{p['total_amount']}")
 
-                    # Adjust earnings
-                    earnings[p["date"]] -= p["total_amount"]
-                    if earnings[p["date"]] <= 0:
-                        earnings.pop(p["date"])  # Remove date if no money left
+                    col_edit, col_delete = st.columns(2)
+                    if col_edit.button("✏️ Edit Record", key=f"edit_{i}"):
+                        st.session_state[f"editing_{i}"] = True
+                        st.rerun()
 
-                    save_json(PATIENTS_FILE, patients)
-                    save_json(EARNINGS_FILE, earnings)
-                    st.success("Record deleted.")
-                    st.rerun()
+                    if col_delete.button("🗑️ Delete Record", key=f"delete_{i}"):
+                        patients.remove(p)
+                        if p["date"] in earnings:
+                            earnings[p["date"]] -= p["total_amount"]
+                            if earnings[p["date"]] <= 0:
+                                earnings.pop(p["date"])
+                        save_json(PATIENTS_FILE, patients)
+                        save_json(EARNINGS_FILE, earnings)
+                        st.success("Record deleted.")
+                        st.rerun()
+
+
 
 # --------------------------- Earnings Summary Page ---------------------------
 elif page == "Earnings":
     st.header("💰 Clinic Earnings Summary")
 
-    if not earnings:
-        st.info("No earnings data available yet.")
+    # Load admin config
+    config_path = os.path.join(DATA_DIR, "admin_config.json")
+    config = load_json(config_path, {"admin_password": "1234"})
+
+    # Check authentication
+    if "earnings_authenticated" not in st.session_state:
+        st.session_state.earnings_authenticated = False
+
+    if not st.session_state.earnings_authenticated:
+        earnings_pass = st.text_input("Enter password to view earnings", type="password")
+        if st.button("Unlock Earnings"):
+            if earnings_pass == config.get("admin_password", "1234"):
+                st.session_state.earnings_authenticated = True
+                st.success("✅ Access granted.")
+                st.rerun()
+            else:
+                st.error("❌ Incorrect password.")
     else:
-        today = datetime.date.today()
-        today_str = str(today)
-        past_7 = [(today - datetime.timedelta(days=i)).isoformat() for i in range(7)]
-        this_month = today.strftime("%Y-%m")
+        # ---------- Earnings content (no changes below this line) ----------
+        if not earnings:
+            st.info("No earnings data available yet.")
+        else:
+            today = datetime.date.today()
+            today_str = str(today)
+            past_7 = [(today - datetime.timedelta(days=i)).isoformat() for i in range(7)]
+            this_month = today.strftime("%Y-%m")
 
-        total_today = earnings.get(today_str, 0)
-        total_week = sum(earnings.get(date, 0) for date in past_7)
-        total_month = sum(amount for date, amount in earnings.items() if date.startswith(this_month))
+            total_today = earnings.get(today_str, 0)
+            total_week = sum(earnings.get(date, 0) for date in past_7)
+            total_month = sum(amount for date, amount in earnings.items() if date.startswith(this_month))
 
-        st.metric("🗓️ Today's Earnings", f"₹{total_today}")
-        st.metric("📅 Last 7 Days", f"₹{total_week}")
-        st.metric("📆 This Month", f"₹{total_month}")
+            st.metric("🗓️ Today's Earnings", f"₹{total_today}")
+            st.metric("📅 Last 7 Days", f"₹{total_week}")
+            st.metric("📆 This Month", f"₹{total_month}")
 
-        st.divider()
-        st.subheader("📊 Click a Date to View Patients")
+            st.divider()
+            st.subheader("📊 Click a Date to View Patients")
 
-        # Group patients by date
-        grouped = {}
-        for p in patients:
-            grouped.setdefault(p["date"], []).append(p)
+            # Group patients by date
+            grouped = {}
+            for p in patients:
+                grouped.setdefault(p["date"], []).append(p)
 
-        for date in sorted(grouped.keys(), reverse=True):
-            with st.expander(f"📅 {date} — ₹{earnings.get(date, 0)}"):
-                for idx, patient in enumerate(grouped[date], 1):
-                    with st.expander(f"{idx}. {patient['name']} — ₹{patient['total_amount']}"):
-                        st.markdown(f"**🧍 Name:** {patient['name']}")
-                        st.markdown(f"**📞 Phone:** {patient['phone']}")
-                        st.markdown(f"**🎂 DOB:** {patient['dob']}  (Age {patient['age']})")
-                        st.markdown(f"**🤒 Symptoms:** {patient['symptoms']}")
+            for date in sorted(grouped.keys(), reverse=True):
+                with st.expander(f"📅 {date} — ₹{earnings.get(date, 0)}"):
+                    for idx, patient in enumerate(grouped[date], 1):
+                        with st.expander(f"{idx}. {patient['name']} — ₹{patient['total_amount']}"):
+                            st.markdown(f"**🧍 Name:** {patient['name']}")
+                            st.markdown(f"**📞 Phone:** {patient['phone']}")
+                            st.markdown(f"**👤 Age:** {patient['age']} years")
+                            st.markdown(f"**🤒 Symptoms:** {patient['symptoms']}")
 
-                        if patient['tests']:
-                            st.markdown("**🧪 Tests:**")
-                            for test in patient['tests']:
-                                st.markdown(f"- {test['name']}: {test['value']} (₹{test['cost']})")
-                        else:
-                            st.markdown("No tests recorded.")
+                            if patient['tests']:
+                                st.markdown("**🧪 Tests:**")
+                                for test in patient['tests']:
+                                    st.markdown(f"- {test['name']}: {test['value']} (₹{test['cost']})")
+                            else:
+                                st.markdown("No tests recorded.")
 
-                        st.markdown(f"**💵 Consultation Fee:** ₹{patient['consultation_fee']}")
-                        st.markdown(f"**💰 Total Paid:** ₹{patient['total_amount']}")
-                        st.markdown(f"**📅 Date:** {patient['date']}")
-                        
+                            st.markdown(f"**💵 Consultation Fee:** ₹{patient['consultation_fee']}")
+                            st.markdown(f"**💰 Total Paid:** ₹{patient['total_amount']}")
+                            st.markdown(f"**📅 Date:** {patient['date']}")
 
 # --------------------------- Backup Page ---------------------------
 elif page == "Backup":
@@ -293,7 +427,6 @@ elif page == "Backup":
             st.success(f"✅ Backup saved as `{backup_filename}`")
         except Exception as e:
             st.error(f"❌ Backup failed: {e}")
-
 
     st.markdown("### 📁 Existing XML Backups:")
 

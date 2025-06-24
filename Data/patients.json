@@ -1,34 +1,99 @@
 [
     {
-        "name": "",
-        "dob": "2025-06-23",
-        "age": 0,
-        "phone": "",
-        "symptoms": "",
-        "tests": [],
-        "consultation_fee": 200,
-        "total_amount": 200,
-        "date": "2025-06-23"
+        "name": "Ibhav",
+        "age": 20,
+        "gender": "Male",
+        "phone": "2141231231",
+        "symptoms": "123123",
+        "tests": [
+            {
+                "name": "SGPT",
+                "value": "",
+                "cost": 2800
+            },
+            {
+                "name": "HB Percent",
+                "value": "",
+                "cost": 2000
+            }
+        ],
+        "consultation_fee": 600,
+        "total_amount": 5400,
+        "date": "2025-06-24"
     },
     {
         "name": "Ibhav Malviya",
-        "age": 52,
-        "phone": "6232381616",
-        "symptoms": "Fever and cough",
-        "tests": [],
-        "consultation_fee": 200,
-        "total_amount": 200,
-        "date": "2025-06-23"
+        "age": 23,
+        "gender": "Male",
+        "phone": "",
+        "symptoms": "sadas",
+        "tests": [
+            {
+                "name": "SGPT",
+                "value": "",
+                "cost": 2800
+            }
+        ],
+        "consultation_fee": 350,
+        "total_amount": 3150,
+        "date": "2025-06-24"
     },
     {
-        "name": "",
-        "age": 0,
+        "name": "harsh",
+        "age": 23,
         "gender": "Male",
-        "phone": "123123123123123123",
-        "symptoms": "",
-        "tests": [],
-        "consultation_fee": 200,
-        "total_amount": 200,
-        "date": "2025-06-23"
+        "phone": "2131231231",
+        "symptoms": "asd",
+        "tests": [
+            {
+                "name": "HB Percent",
+                "value": "",
+                "cost": 2000
+            }
+        ],
+        "consultation_fee": 350,
+        "total_amount": 2350,
+        "date": "2025-06-24"
+    },
+    {
+        "name": "Pramod Malviya",
+        "age": 60,
+        "gender": "Male",
+        "phone": "1231232131",
+        "symptoms": "Fever",
+        "tests": [
+            {
+                "name": "Blood",
+                "value": "",
+                "cost": 100
+            }
+        ],
+        "consultation_fee": 350,
+        "total_amount": 450,
+        "date": "2025-06-24",
+        "time": "15:55"
+    },
+    {
+        "name": "neel",
+        "age": 23,
+        "gender": "Male",
+        "phone": "1231231231",
+        "symptoms": "123123123",
+        "tests": [
+            {
+                "name": "SGPT",
+                "value": "",
+                "cost": 280
+            },
+            {
+                "name": "HB Percent",
+                "value": "",
+                "cost": 200
+            }
+        ],
+        "consultation_fee": 500,
+        "total_amount": 980,
+        "date": "2025-06-24",
+        "time": "15:55"
     }
 ]
