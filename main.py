@@ -87,27 +87,32 @@ if page == "Add Patient":
                     "cost": tests[test_name]
                 })
 
-        # Display selected tests with editable values
+        # Calculate test costs live
         total_test_cost = 0
         if st.session_state.selected_tests:
             st.markdown("### ✅ Selected Tests")
             for i, test in enumerate(st.session_state.selected_tests):
                 col1, col2, col3 = st.columns([4, 3, 2])
                 col1.markdown(f"**{test['name']}**")
-                test['value'] = col2.text_input("Result", value=test['value'], key=f"res_{i}")
-                test['cost'] = col3.number_input("₹", value=test['cost'], min_value=0, key=f"cost_{i}")
+                test['value'] = col2.text_input("Result", value=test.get('value', ''), key=f"res_{i}")
+                test['cost'] = col3.number_input("₹", value=test.get('cost', 0), min_value=0, key=f"cost_{i}")
                 total_test_cost += test["cost"]
 
-        # Consultation fee input with state
+        # Live consultation fee input (will also trigger re-render)
         consult_fee = st.number_input("💵 Consultation Fee", value=st.session_state.get("consult_fee", 350), min_value=0, key="consult_fee")
 
-        # Live total amount
+        # Calculate and show total
         total_amount = total_test_cost + consult_fee
         st.markdown(f"### 💰 Total Amount: ₹{total_amount}")
-
-        # Reset selected tests if form is cleared or submitted
-        submitted = st.form_submit_button("Save Patient Record")
-        if submitted:
+        submitted_col1, submitted_col2 = st.columns([1, 1])
+        calculate_pressed = submitted_col1.form_submit_button("🧮 Calculate Total")
+        save_pressed = submitted_col2.form_submit_button("💾 Save Patient Record")
+        # Compute total test cost
+        total_test_cost = sum(test["cost"] for test in st.session_state.selected_tests)
+        total_amount = total_test_cost + st.session_state.consult_fee
+        # Show calculated total if Calculate button is clicked
+        
+        if save_pressed:
             if not patient_name.strip():
                 st.error("❌ Patient name is required. Record not saved.")
             else:
